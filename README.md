@@ -308,3 +308,4 @@ middleware.ts               — Auth route protection
 - Middleware redirects unauthenticated users
 - API validates all inputs before database writes
 - Storage policies restrict file access per user
+
