@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Shield, Loader2 } from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -31,6 +31,39 @@ export default function LoginPage() {
   };
 
   return (
+    <Card>
+      <CardHeader className="space-y-1">
+        <CardTitle className="text-xl">Sign in</CardTitle>
+        <CardDescription>Enter your email and password to access your dashboard</CardDescription>
+      </CardHeader>
+      <form onSubmit={handleLogin}>
+        <CardContent className="space-y-4">
+          {error && <div className="rounded-lg bg-destructive/10 text-destructive text-sm p-3">{error}</div>}
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input id="password" type="password" placeholder="Min 6 characters" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+        </CardContent>
+        <CardFooter className="flex flex-col gap-3">
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...</> : "Sign in"}
+          </Button>
+          <p className="text-sm text-muted-foreground text-center">
+            No account?{" "}
+            <Link href="/register" className="text-primary hover:underline font-medium">Create one</Link>
+          </p>
+        </CardFooter>
+      </form>
+    </Card>
+  );
+}
+
+export default function LoginPage() {
+  return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-3 mb-8">
@@ -42,34 +75,9 @@ export default function LoginPage() {
             <p className="text-xs text-muted-foreground">Invoice & Warranty Tracker</p>
           </div>
         </div>
-        <Card>
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-xl">Sign in</CardTitle>
-            <CardDescription>Enter your email and password to access your dashboard</CardDescription>
-          </CardHeader>
-          <form onSubmit={handleLogin}>
-            <CardContent className="space-y-4">
-              {error && <div className="rounded-lg bg-destructive/10 text-destructive text-sm p-3">{error}</div>}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" placeholder="Min 6 characters" value={password} onChange={(e) => setPassword(e.target.value)} required />
-              </div>
-            </CardContent>
-            <CardFooter className="flex flex-col gap-3">
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...</> : "Sign in"}
-              </Button>
-              <p className="text-sm text-muted-foreground text-center">
-                No account?{" "}
-                <Link href="/register" className="text-primary hover:underline font-medium">Create one</Link>
-              </p>
-            </CardFooter>
-          </form>
-        </Card>
+        <Suspense fallback={<div className="text-center text-muted-foreground">Loading...</div>}>
+          <LoginForm />
+        </Suspense>
       </div>
     </div>
   );
