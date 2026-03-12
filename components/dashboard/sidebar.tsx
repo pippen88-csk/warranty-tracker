@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Upload, FileText, Shield, LogOut } from "lucide-react";
-import { createClient } from "@/lib/supabase-browser";
+import { LayoutDashboard, Upload, Shield, LogOut } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -53,4 +53,3 @@ export function Sidebar() {
     </aside>
   );
 }
-

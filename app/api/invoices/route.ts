@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminSupabase } from "@/lib/supabase-server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { addMonths, parseISO, format } from "date-fns";
 
 export async function POST(req: NextRequest) {
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const supabase = createAdminSupabase();
+    const supabase = createAdminClient();
 
     const { data: customer, error: custError } = await supabase
       .from("customers").select("id").eq("id", customer_id).single();
@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
     const customerId = new URL(req.url).searchParams.get("customer_id");
     if (!customerId) return NextResponse.json({ error: "customer_id is required" }, { status: 400 });
 
-    const supabase = createAdminSupabase();
+    const supabase = createAdminClient();
     const { data: invoices, error } = await supabase
       .from("invoices")
       .select("id, invoice_number, invoice_date, pdf_url, status, created_at, products (id, product_name, serial_number, warranty_expiry_date)")

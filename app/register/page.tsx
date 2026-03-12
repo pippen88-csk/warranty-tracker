@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase-browser";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,7 +50,7 @@ export default function RegisterPage() {
             <CardContent>
               <div className="rounded-lg bg-green-50 dark:bg-green-950/30 text-green-800 dark:text-green-400 text-sm p-4">
                 <p className="font-medium">Check your email</p>
-                <p className="mt-1">We sent a confirmation link to <strong>{email}</strong>. Click it to activate your account.</p>
+                <p className="mt-1">We sent a confirmation link to <strong>{email}</strong>.</p>
               </div>
               <div className="mt-4"><Link href="/login"><Button variant="outline" className="w-full">Back to sign in</Button></Link></div>
             </CardContent>
@@ -64,7 +64,7 @@ export default function RegisterPage() {
               </CardContent>
               <CardFooter className="flex flex-col gap-3">
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating account...</> : "Create account"}
+                  {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating...</> : "Create account"}
                 </Button>
                 <p className="text-sm text-muted-foreground text-center">Already have an account? <Link href="/login" className="text-primary hover:underline font-medium">Sign in</Link></p>
               </CardFooter>
@@ -75,4 +75,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-

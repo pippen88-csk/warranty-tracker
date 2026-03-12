@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-import { createClient } from "@/lib/supabase-browser";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -44,7 +44,7 @@ export function FileUploader({ customerId }: { customerId: string }) {
       setFiles((prev) => prev.map((f, idx) => (idx === i ? { ...f, status: "uploading", progress: 20 } : f)));
 
       try {
-        const fileName = `${customerId}/${Date.now()}_${files[i].file.name}`;
+        const fileName = customerId + "/" + Date.now() + "_" + files[i].file.name;
         const { error: uploadError } = await supabase.storage.from("invoices").upload(fileName, files[i].file);
         if (uploadError) throw uploadError;
 
@@ -54,7 +54,6 @@ export function FileUploader({ customerId }: { customerId: string }) {
 
         setFiles((prev) => prev.map((f, idx) => (idx === i ? { ...f, status: "processing", progress: 70 } : f)));
 
-        // Trigger Make.com webhook
         const webhookUrl = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL;
         if (webhookUrl) {
           await fetch(webhookUrl, {
@@ -89,14 +88,13 @@ export function FileUploader({ customerId }: { customerId: string }) {
           </div>
         </div>
       </div>
-
       {files.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium">{files.length} file{files.length !== 1 ? "s" : ""} selected</h3>
             {pendingCount > 0 && (
               <Button onClick={uploadFiles} disabled={uploading} size="sm">
-                {uploading ? (<><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>) : (<><Upload className="mr-2 h-3 w-3" />Upload {pendingCount} file{pendingCount !== 1 ? "s" : ""}</>)}
+                {uploading ? <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</> : <><Upload className="mr-2 h-3 w-3" />Upload {pendingCount} file{pendingCount !== 1 ? "s" : ""}</>}
               </Button>
             )}
           </div>
@@ -109,7 +107,7 @@ export function FileUploader({ customerId }: { customerId: string }) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{f.file.name}</p>
-                    <p className="text-xs text-muted-foreground">{(f.file.size / 1024 / 1024).toFixed(2)} MB{f.status === "processing" ? " — Parsing invoice..." : f.status === "done" ? " — Parsed successfully" : f.error ? ` — ${f.error}` : ""}</p>
+                    <p className="text-xs text-muted-foreground">{(f.file.size / 1024 / 1024).toFixed(2)} MB{f.status === "processing" ? " — Parsing invoice..." : f.status === "done" ? " — Parsed successfully" : f.error ? " — " + f.error : ""}</p>
                     {(f.status === "uploading" || f.status === "processing") && <Progress value={f.progress} className="h-1.5 mt-2" />}
                   </div>
                   {f.status === "pending" && <Button variant="ghost" size="sm" onClick={() => removeFile(i)} className="text-muted-foreground">Remove</Button>}
@@ -122,4 +120,3 @@ export function FileUploader({ customerId }: { customerId: string }) {
     </div>
   );
 }
-

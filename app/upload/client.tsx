@@ -9,12 +9,12 @@ export function UploadPageClient({ customerId }: { customerId: string }) {
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Upload Invoices</h2>
-        <p className="text-muted-foreground mt-1">Upload your invoice PDFs and we&apos;ll automatically extract product and warranty information.</p>
+        <p className="text-muted-foreground mt-1">Upload your invoice PDFs and we will automatically extract product and warranty information.</p>
       </div>
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Invoice PDFs</CardTitle>
-          <CardDescription>Drag and drop one or more PDF invoices. We&apos;ll parse them automatically.</CardDescription>
+          <CardDescription>Drag and drop one or more PDF invoices.</CardDescription>
         </CardHeader>
         <CardContent>
           <FileUploader customerId={customerId} />
@@ -22,7 +22,7 @@ export function UploadPageClient({ customerId }: { customerId: string }) {
       </Card>
       <div className="grid gap-4 sm:grid-cols-3">
         {[
-          { icon: FileText, title: "Upload PDF", desc: "Drop your invoice file and it's securely stored" },
+          { icon: FileText, title: "Upload PDF", desc: "Drop your invoice file and it is securely stored" },
           { icon: Zap, title: "Auto-Parse", desc: "AI extracts invoice number, products, and serial numbers" },
           { icon: Shield, title: "Track Warranty", desc: "30-month warranty countdown starts automatically" },
         ].map((item) => (
@@ -40,4 +40,3 @@ export function UploadPageClient({ customerId }: { customerId: string }) {
     </div>
   );
 }
-

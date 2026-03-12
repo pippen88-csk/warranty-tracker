@@ -1,15 +1,15 @@
-import { createServerSupabase } from "@/lib/supabase-server";
+import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Header } from "@/components/dashboard/header";
 import { UploadPageClient } from "./client";
 
 export default async function UploadPage() {
-  const supabase = createServerSupabase();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) redirect("/login");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
-  const { data: customer } = await supabase.from("customers").select("*").eq("auth_id", session.user.id).single();
+  const { data: customer } = await supabase.from("customers").select("*").eq("auth_id", user.id).single();
   if (!customer) redirect("/login");
 
   return (
