@@ -1,9 +1,6 @@
-// ============================================================
-// DATABASE TYPES
-// ============================================================
-
 export interface Customer {
   id: string;
+  auth_id: string;
   name: string;
   email: string;
   created_at: string;
@@ -15,68 +12,28 @@ export interface Invoice {
   invoice_number: string;
   invoice_date: string;
   pdf_url: string | null;
+  status: "pending" | "parsing" | "parsed" | "failed";
   created_at: string;
-  products?: Product[];
 }
 
 export interface Product {
   id: string;
   invoice_id: string;
   product_name: string;
-  serial_number: string;
+  serial_number: string | null;
   warranty_expiry_date: string;
   created_at: string;
 }
 
-// ============================================================
-// API TYPES
-// ============================================================
-
-export interface InvoicePayload {
-  invoice_number: string;
-  invoice_date: string;
-  product_name: string;
-  serial_number: string;
-  customer_id: string;
-  pdf_url: string;
-}
-
-// Supports multiple products per invoice (critical requirement)
-export interface InvoicePayloadMulti {
-  invoice_number: string;
-  invoice_date: string;
-  products: Array<{
-    product_name: string;
-    serial_number: string;
-  }>;
-  customer_id: string;
-  pdf_url: string;
-}
-
-export interface UploadWebhookPayload {
-  file_url: string;
-  customer_id: string;
-}
-
-// ============================================================
-// UI TYPES
-// ============================================================
-
-export type WarrantyStatus = "active" | "expired" | "expiring_soon";
-
 export interface ProductWithWarranty extends Product {
   days_remaining: number;
-  warranty_status: WarrantyStatus;
+  warranty_status: "active" | "expiring_soon" | "expired";
 }
 
-export interface InvoiceWithProducts extends Invoice {
+export interface InvoiceGroup {
+  invoice_id: string;
+  invoice_number: string;
+  invoice_date: string;
+  pdf_url: string | null;
   products: ProductWithWarranty[];
 }
-
-export interface UploadProgress {
-  file: File;
-  progress: number;
-  status: "pending" | "uploading" | "processing" | "complete" | "error";
-  error?: string;
-}
-
