@@ -1,3 +1,9 @@
+#!/bin/bash
+set -e
+echo "Fixing 3 broken files..."
+
+echo "  1/3 Fixing components/dashboard/invoice-table.tsx..."
+cat > components/dashboard/invoice-table.tsx << 'ENDFILE'
 "use client";
 
 import { useState } from "react";
@@ -150,3 +156,172 @@ export function InvoiceTable({ invoiceGroups }: { invoiceGroups: InvoiceGroup[] 
     </Card>
   );
 }
+ENDFILE
+
+echo "  2/3 Fixing app/api/invoices/route.ts..."
+cat > app/api/invoices/route.ts << 'ENDFILE'
+import { NextRequest, NextResponse } from "next/server";
+import { createAdminSupabase } from "@/lib/supabase-server";
+import { addMonths, parseISO, format } from "date-fns";
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { invoice_number, invoice_date, products, customer_id, pdf_url } = body;
+
+    if (!invoice_number || !invoice_date || !customer_id) {
+      return NextResponse.json({ error: "Missing required fields: invoice_number, invoice_date, customer_id" }, { status: 400 });
+    }
+
+    if (!products || !Array.isArray(products) || products.length === 0) {
+      return NextResponse.json({ error: "products must be a non-empty array" }, { status: 400 });
+    }
+
+    for (const product of products) {
+      if (!product.product_name) {
+        return NextResponse.json({ error: "Each product must have a product_name" }, { status: 400 });
+      }
+    }
+
+    const supabase = createAdminSupabase();
+
+    const { data: customer, error: custError } = await supabase
+      .from("customers").select("id").eq("id", customer_id).single();
+
+    if (custError || !customer) {
+      return NextResponse.json({ error: "Customer not found" }, { status: 404 });
+    }
+
+    const { data: invoice, error: invError } = await supabase
+      .from("invoices")
+      .insert({ customer_id, invoice_number, invoice_date, pdf_url: pdf_url || null, status: "parsed" })
+      .select()
+      .single();
+
+    if (invError) {
+      console.error("Invoice insert error:", invError);
+      return NextResponse.json({ error: "Failed to create invoice" }, { status: 500 });
+    }
+
+    const parsedDate = parseISO(invoice_date);
+    const productRows = products.map((p: { product_name: string; serial_number?: string }) => ({
+      invoice_id: invoice.id,
+      product_name: p.product_name,
+      serial_number: p.serial_number || null,
+      warranty_expiry_date: format(addMonths(parsedDate, 30), "yyyy-MM-dd"),
+    }));
+
+    const { data: insertedProducts, error: prodError } = await supabase
+      .from("products").insert(productRows).select();
+
+    if (prodError) {
+      console.error("Product insert error:", prodError);
+      await supabase.from("invoices").delete().eq("id", invoice.id);
+      return NextResponse.json({ error: "Failed to create products" }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      message: "Invoice and products created successfully",
+      invoice: { id: invoice.id, invoice_number, invoice_date, product_count: insertedProducts.length },
+    }, { status: 201 });
+  } catch (err: any) {
+    console.error("API error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const customerId = new URL(req.url).searchParams.get("customer_id");
+    if (!customerId) return NextResponse.json({ error: "customer_id is required" }, { status: 400 });
+
+    const supabase = createAdminSupabase();
+    const { data: invoices, error } = await supabase
+      .from("invoices")
+      .select("id, invoice_number, invoice_date, pdf_url, status, created_at, products (id, product_name, serial_number, warranty_expiry_date)")
+      .eq("customer_id", customerId)
+      .order("invoice_date", { ascending: false });
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ invoices });
+  } catch {
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+ENDFILE
+
+echo "  3/3 Fixing app/dashboard/page.tsx..."
+cat > app/dashboard/page.tsx << 'ENDFILE'
+import { createServerSupabase } from "@/lib/supabase-server";
+import { redirect } from "next/navigation";
+import { Sidebar } from "@/components/dashboard/sidebar";
+import { Header } from "@/components/dashboard/header";
+import { DashboardStats } from "@/components/dashboard/stats";
+import { InvoiceTable } from "@/components/dashboard/invoice-table";
+import type { InvoiceGroup, ProductWithWarranty } from "@/lib/types";
+import { differenceInDays, parseISO } from "date-fns";
+
+export const dynamic = "force-dynamic";
+
+export default async function DashboardPage() {
+  const supabase = createServerSupabase();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) redirect("/login");
+
+  const { data: customer } = await supabase.from("customers").select("*").eq("auth_id", session.user.id).single();
+  if (!customer) redirect("/login");
+
+  const { data: invoices } = await supabase
+    .from("invoices")
+    .select("id, invoice_number, invoice_date, pdf_url, customer_id, products (id, product_name, serial_number, warranty_expiry_date, created_at)")
+    .eq("customer_id", customer.id)
+    .order("invoice_date", { ascending: false });
+
+  const invoiceGroups: InvoiceGroup[] = (invoices || []).map((inv: any) => {
+    const products: ProductWithWarranty[] = (inv.products || []).map((p: any) => {
+      const daysRemaining = differenceInDays(parseISO(p.warranty_expiry_date), new Date());
+      return {
+        ...p,
+        invoice_id: inv.id,
+        days_remaining: daysRemaining,
+        warranty_status: daysRemaining > 90 ? "active" : daysRemaining > 0 ? "expiring_soon" : "expired",
+      };
+    });
+    return { invoice_id: inv.id, invoice_number: inv.invoice_number, invoice_date: inv.invoice_date, pdf_url: inv.pdf_url, products };
+  });
+
+  const allProducts = invoiceGroups.flatMap((g) => g.products);
+  const stats = {
+    totalInvoices: invoiceGroups.length,
+    totalProducts: allProducts.length,
+    activeWarranties: allProducts.filter((p) => p.warranty_status === "active").length,
+    expiringSoon: allProducts.filter((p) => p.warranty_status === "expiring_soon").length,
+    expired: allProducts.filter((p) => p.warranty_status === "expired").length,
+  };
+
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <div className="flex-1 flex flex-col">
+        <Header customerName={customer.name} />
+        <main className="flex-1 p-6 lg:p-8 space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Warranty Dashboard</h2>
+            <p className="text-muted-foreground mt-1">Track all your product warranties in one place.</p>
+          </div>
+          <DashboardStats {...stats} />
+          <InvoiceTable invoiceGroups={invoiceGroups} />
+        </main>
+      </div>
+    </div>
+  );
+}
+ENDFILE
+
+echo ""
+echo "All 3 files fixed!"
+echo ""
+echo "Now run:"
+echo "  git add ."
+echo '  git commit -m "Fix broken imports"'
+echo "  git push"

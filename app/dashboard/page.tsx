@@ -1,74 +1,64 @@
-import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase-server";
-import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { StatsCards } from "@/components/dashboard/stats-cards";
+import { redirect } from "next/navigation";
+import { Sidebar } from "@/components/dashboard/sidebar";
+import { Header } from "@/components/dashboard/header";
+import { DashboardStats } from "@/components/dashboard/stats";
 import { InvoiceTable } from "@/components/dashboard/invoice-table";
-import { enrichProduct } from "@/utils/warranty";
-import type { InvoiceWithProducts, Invoice, Product } from "@/lib/types";
-import Link from "next/link";
-import { Upload } from "lucide-react";
+import type { InvoiceGroup, ProductWithWarranty } from "@/lib/types";
+import { differenceInDays, parseISO } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
-async function getInvoicesWithProducts(userId: string): Promise<InvoiceWithProducts[]> {
-  const supabase = createServerSupabase();
-
-  const { data: invoices, error: invError } = await supabase
-    .from("invoices")
-    .select("*")
-    .eq("customer_id", userId)
-    .order("invoice_date", { ascending: false });
-
-  if (invError || !invoices) return [];
-
-  const invoiceIds = invoices.map((inv: Invoice) => inv.id);
-  if (invoiceIds.length === 0) return [];
-
-  const { data: products, error: prodError } = await supabase
-    .from("products")
-    .select("*")
-    .in("invoice_id", invoiceIds);
-
-  if (prodError) return [];
-
-  const productsByInvoice = (products || []).reduce(
-    (acc: Record<string, Product[]>, product: Product) => {
-      if (!acc[product.invoice_id]) acc[product.invoice_id] = [];
-      acc[product.invoice_id].push(product);
-      return acc;
-    },
-    {} as Record<string, Product[]>
-  );
-
-  return invoices.map((invoice: Invoice) => ({
-    ...invoice,
-    products: (productsByInvoice[invoice.id] || []).map(enrichProduct),
-  }));
-}
-
 export default async function DashboardPage() {
   const supabase = createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) redirect("/login");
 
-  const invoices = await getInvoicesWithProducts(user.id);
+  const { data: customer } = await supabase.from("customers").select("*").eq("auth_id", session.user.id).single();
+  if (!customer) redirect("/login");
+
+  const { data: invoices } = await supabase
+    .from("invoices")
+    .select("id, invoice_number, invoice_date, pdf_url, customer_id, products (id, product_name, serial_number, warranty_expiry_date, created_at)")
+    .eq("customer_id", customer.id)
+    .order("invoice_date", { ascending: false });
+
+  const invoiceGroups: InvoiceGroup[] = (invoices || []).map((inv: any) => {
+    const products: ProductWithWarranty[] = (inv.products || []).map((p: any) => {
+      const daysRemaining = differenceInDays(parseISO(p.warranty_expiry_date), new Date());
+      return {
+        ...p,
+        invoice_id: inv.id,
+        days_remaining: daysRemaining,
+        warranty_status: daysRemaining > 90 ? "active" : daysRemaining > 0 ? "expiring_soon" : "expired",
+      };
+    });
+    return { invoice_id: inv.id, invoice_number: inv.invoice_number, invoice_date: inv.invoice_date, pdf_url: inv.pdf_url, products };
+  });
+
+  const allProducts = invoiceGroups.flatMap((g) => g.products);
+  const stats = {
+    totalInvoices: invoiceGroups.length,
+    totalProducts: allProducts.length,
+    activeWarranties: allProducts.filter((p) => p.warranty_status === "active").length,
+    expiringSoon: allProducts.filter((p) => p.warranty_status === "expiring_soon").length,
+    expired: allProducts.filter((p) => p.warranty_status === "expired").length,
+  };
 
   return (
-    <DashboardShell title="Warranty Dashboard">
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <div className="flex-1 flex flex-col">
+        <Header customerName={customer.name} />
+        <main className="flex-1 p-6 lg:p-8 space-y-6">
           <div>
-            <h2 className="text-lg font-semibold">Overview</h2>
-            <p className="text-sm text-surface-500 mt-0.5">Track all your product warranties in one place</p>
+            <h2 className="text-2xl font-bold tracking-tight">Warranty Dashboard</h2>
+            <p className="text-muted-foreground mt-1">Track all your product warranties in one place.</p>
           </div>
-          <Link href="/upload" className="btn-primary">
-            <Upload className="w-4 h-4" /> Upload Invoice
-          </Link>
-        </div>
-        <StatsCards invoices={invoices} />
-        <InvoiceTable invoices={invoices} />
+          <DashboardStats {...stats} />
+          <InvoiceTable invoiceGroups={invoiceGroups} />
+        </main>
       </div>
-    </DashboardShell>
+    </div>
   );
 }
-
