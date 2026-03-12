@@ -1,28 +1,26 @@
-import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase-server";
-import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { FileUploader } from "@/components/dashboard/file-uploader";
+import { redirect } from "next/navigation";
+import { Sidebar } from "@/components/dashboard/sidebar";
+import { Header } from "@/components/dashboard/header";
+import { UploadPageClient } from "./client";
 
 export default async function UploadPage() {
   const supabase = createServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) redirect("/login");
 
-  if (!user) redirect("/login");
+  const { data: customer } = await supabase.from("customers").select("*").eq("auth_id", session.user.id).single();
+  if (!customer) redirect("/login");
 
   return (
-    <DashboardShell title="Upload Invoices">
-      <div className="max-w-2xl">
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold">Upload Invoice PDFs</h2>
-          <p className="text-sm text-surface-500 mt-1">
-            Drop your invoices below. We&apos;ll parse them automatically and add products to your dashboard.
-          </p>
-        </div>
-        <FileUploader />
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <div className="flex-1 flex flex-col">
+        <Header customerName={customer.name} />
+        <main className="flex-1 p-6 lg:p-8">
+          <UploadPageClient customerId={customer.id} />
+        </main>
       </div>
-    </DashboardShell>
+    </div>
   );
 }
-
